@@ -1,0 +1,31 @@
+name: Wait for Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - pages-build-deployment
+    types:
+      - completed
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Send Telegram Message - Deploy Success
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "✅ Build hash-tools.thanhlv.com with build number: ${{ github.event.workflow_run.run_number }}, Deploy to GitHub Pages completed successfully!"
+
+      - name: Send Telegram Message - Deploy Failed
+        if: ${{ github.event.workflow_run.conclusion != 'success' }}
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "❌ Build hash-tools.thanhlv.com with build number: ${{ github.event.workflow_run.run_number }}, Deploy to GitHub Pages failed with status: ${{ github.event.workflow_run.conclusion }}."

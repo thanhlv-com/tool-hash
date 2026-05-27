@@ -1,0 +1,99 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-to-github-pages
+  cancel-in-progress: true
+
+run-name: Deploy to GitHub Pages
+
+jobs:
+  build_app:
+    runs-on: ubuntu-latest
+    name: Build live
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - name: Send Telegram Message - Start
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "🚀 Build hash-tools.thanhlv.com with build number: ${{ github.run_number }}, Start"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.yaml') }}}}
+          restore-keys: |
+            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.yaml') }} }}
+      - name: Send Telegram Message - Install deps
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "Build hash-tools.thanhlv.com with build number: ${{ github.run_number }}, Install deps"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Send Telegram Message - Build
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "Build hash-tools.thanhlv.com with build number: ${{ github.run_number }}, Build html"
+
+      - name: Build app
+        run: npm run build
+
+      - name: Add SPA fallback for direct route access
+        run: cp dist/index.html dist/404.html
+
+      - name: Send Telegram Message - Deploy
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "Build hash-tools.thanhlv.com with build number: ${{ github.run_number }}, Deploy to GitHub Pages"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+
+      - name: Send Telegram Message - Failed
+        if: failure()
+        uses: cbrgm/telegram-github-action@v1
+        with:
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ vars.TELEGRAM_CHAT_ID }}
+          thread-id: ${{ vars.MESSAGE_THREAD_ID_DEPLOY_THANHLV_BLOG }}
+          message: "❌ Build hash-tools.thanhlv.com with build number: ${{ github.run_number }} failed. Check GitHub Actions logs."
