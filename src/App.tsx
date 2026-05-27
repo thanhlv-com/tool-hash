@@ -49,10 +49,23 @@ export default function App() {
   
   // Processing
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<Record<AlgoId, { status: 'computing' | 'done' | 'error', result?: string, error?: string }>>({} as any);
+  const [results, setResultsState] = useState<Record<AlgoId, { status: 'computing' | 'done' | 'error', result?: string, error?: string }>>({} as any);
+  const resultsRef = useRef<Record<AlgoId, { status: 'computing' | 'done' | 'error', result?: string, error?: string }>>({} as any);
+
+  const setResults = useCallback((valOrFn: any) => {
+    if (typeof valOrFn === 'function') {
+      const next = valOrFn(resultsRef.current);
+      resultsRef.current = next;
+      setResultsState(next);
+    } else {
+      resultsRef.current = valOrFn;
+      setResultsState(valOrFn);
+    }
+  }, []);
 
   const workerRef = useRef<Worker | null>(null);
   const currentJobIdRef = useRef<number>(0);
+  const inputRef = useRef({ activeTab, textInput, file, selectedEncoding });
 
   // Copied state
   const [copiedId, setCopiedId] = useState<AlgoId | null>(null);
@@ -69,7 +82,7 @@ export default function App() {
         return;
       }
       
-      setResults(prev => ({
+      setResults((prev: any) => ({
         ...prev,
         [algoId as AlgoId]: { status, result, error }
       }));
@@ -78,7 +91,122 @@ export default function App() {
     return () => {
       workerRef.current?.terminate();
     };
-  }, []);
+  }, [setResults]);
+
+  useEffect(() => {
+    const isInputChanged = 
+      inputRef.current.activeTab !== activeTab ||
+      inputRef.current.textInput !== textInput ||
+      inputRef.current.file !== file ||
+      inputRef.current.selectedEncoding !== selectedEncoding;
+      
+    inputRef.current = { activeTab, textInput, file, selectedEncoding };
+    
+    if (activeTab === 'text') {
+      const timeoutId = setTimeout(() => {
+        if (!textInput) {
+          setResults({});
+          return;
+        }
+
+        if (isInputChanged) {
+          setResults({});
+          currentJobIdRef.current += 1;
+        }
+        
+        const algosToCompute: string[] = [];
+        ALGORITHMS.forEach(a => {
+          if (a.fileOnly && activeTab === 'text') return;
+          if (selectedAlgos.has(a.id as AlgoId)) {
+             if (isInputChanged || !resultsRef.current[a.id as AlgoId]) {
+                algosToCompute.push(a.id);
+             }
+          }
+        });
+        
+        if (algosToCompute.length > 0) {
+           setIsProcessing(true);
+           workerRef.current?.postMessage({
+             jobId: currentJobIdRef.current,
+             text: textInput,
+             selectedAlgos: algosToCompute,
+             selectedEncoding
+           });
+           
+           setResults((prev: any) => {
+             const next = { ...prev };
+             algosToCompute.forEach(id => {
+               next[id as AlgoId] = { status: 'computing' };
+             });
+             return next;
+           });
+        }
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      // file tab
+      if (!file) {
+        setResults({});
+        return;
+      }
+      
+      if (file.size > 100 * 1024 * 1024) {
+        setFileError('File surpasses the 100MB limit. Please select a smaller file.');
+        setIsProcessing(false);
+        return;
+      }
+      
+      setFileError(null);
+      
+      if (isInputChanged) {
+        setResults({});
+        currentJobIdRef.current += 1;
+      }
+      
+      const algosToCompute: string[] = [];
+      ALGORITHMS.forEach(a => {
+        if (selectedAlgos.has(a.id as AlgoId)) {
+           if (isInputChanged || !resultsRef.current[a.id as AlgoId]) {
+              algosToCompute.push(a.id);
+           }
+        }
+      });
+      
+      if (algosToCompute.length > 0) {
+        setIsProcessing(true);
+        
+        setResults((prev: any) => {
+           const next = { ...prev };
+           algosToCompute.forEach(id => {
+             next[id as AlgoId] = { status: 'computing' };
+           });
+           return next;
+        });
+        
+        const jobId = currentJobIdRef.current;
+        file.arrayBuffer().then(buffer => {
+          if (currentJobIdRef.current !== jobId) return;
+          workerRef.current?.postMessage({
+             jobId,
+             buffer,
+             selectedAlgos: algosToCompute,
+             selectedEncoding
+          }, [buffer]);
+        }).catch(err => {
+          if (currentJobIdRef.current !== jobId) return;
+          setFileError(err.message || 'Error reading file');
+          setIsProcessing(false);
+          setResults((prev: any) => {
+             const next = { ...prev };
+             algosToCompute.forEach(id => {
+               next[id as AlgoId] = { status: 'error', error: err.message };
+             });
+             return next;
+          });
+        });
+      }
+    }
+  }, [activeTab, textInput, file, selectedEncoding, selectedAlgos, setResults]);
 
   const toggleAlgo = (id: AlgoId) => {
     const next = new Set(selectedAlgos);
@@ -97,82 +225,6 @@ export default function App() {
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
-
-  const processText = useCallback(() => {
-    if (!textInput) {
-      setResults({} as any);
-      return;
-    }
-    
-    currentJobIdRef.current += 1;
-    const jobId = currentJobIdRef.current;
-    
-    setIsProcessing(true);
-    setResults({} as any);
-    
-    const algosList = ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map(a => a.id);
-    
-    workerRef.current?.postMessage({
-      jobId,
-      text: textInput,
-      selectedAlgos: algosList,
-      selectedEncoding
-    });
-  }, [textInput, selectedAlgos, selectedEncoding, activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'text') {
-      const timeoutId = setTimeout(() => {
-        processText();
-      }, 300); // debounce text evaluation
-      return () => clearTimeout(timeoutId);
-    }
-  }, [textInput, selectedAlgos, selectedEncoding, activeTab, processText]);
-
-  const processFile = useCallback(async () => {
-    if (!file) {
-      setResults({} as any);
-      return;
-    }
-    
-    // Limit file size to 100MB
-    if (file.size > 100 * 1024 * 1024) {
-      setFileError('File surpasses the 100MB limit. Please select a smaller file.');
-      setIsProcessing(false);
-      return;
-    }
-
-    currentJobIdRef.current += 1;
-    const jobId = currentJobIdRef.current;
-    
-    setIsProcessing(true);
-    setFileError(null);
-    setResults({} as any);
-    
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      const algosList = ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map(a => a.id);
-      
-      workerRef.current?.postMessage({
-        jobId,
-        buffer: arrayBuffer,
-        selectedAlgos: algosList,
-        selectedEncoding
-      }, [arrayBuffer]);
-      
-    } catch (e: any) {
-      setFileError(e.message || 'An error occurred while reading the file.');
-      setResults({} as any);
-      setIsProcessing(false);
-    }
-  }, [file, selectedAlgos, selectedEncoding, activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'file' && file) {
-      processFile();
-    }
-  }, [file, selectedAlgos, selectedEncoding, activeTab, processFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
