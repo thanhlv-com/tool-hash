@@ -1,0 +1,8 @@
+{
+  "name": "Multi-Algorithm Hasher",
+  "description": "A versatile text and file hashing utility supporting MD5, SHA-1, SHA-256, SHA-512, and SHA-3.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
