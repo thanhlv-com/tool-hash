@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import CryptoJS from 'crypto-js';
-import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings } from 'lucide-react';
+import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -8,65 +7,30 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const ALGORITHMS = [
-  { id: 'MD5', lib: CryptoJS.MD5 },
-  { id: 'SHA-1', lib: CryptoJS.SHA1 },
-  { id: 'SHA-256', lib: CryptoJS.SHA256 },
-  { id: 'SHA-512', lib: CryptoJS.SHA512 },
-  { id: 'SHA-3', lib: CryptoJS.SHA3 },
-] as const;
+type AlgorithmDef = {
+  id: string;
+  desc?: string;
+  fileOnly?: boolean;
+};
 
-type AlgoId = typeof ALGORITHMS[number]['id'];
+const ALGORITHMS: AlgorithmDef[] = [
+  { id: 'MD5', desc: 'Fast, widely used' },
+  { id: 'SHA-1', desc: 'Legacy, fast', fileOnly: true },
+  { id: 'SHA-256', desc: 'Highly secure' },
+  { id: 'SHA-512', desc: '64-bit opt.' },
+  { id: 'SHA-3', desc: 'Latest standard' },
+  { id: 'SM3', desc: 'Chinese standard' },
+  { id: 'GOST 256', desc: 'Streebog 256' },
+  { id: 'GOST 512', desc: 'Streebog 512', fileOnly: true },
+  { id: 'RIPEMD-160', desc: 'Bitcoin standard' },
+  { id: 'BLAKE2b', desc: 'Faster on 64-bit', fileOnly: true },
+  { id: 'BLAKE2s', desc: 'Faster on 32-bit', fileOnly: true },
+  { id: 'BLAKE3', desc: 'Extremely fast' },
+];
+
+type AlgoId = 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-512' | 'SHA-3' | 'SM3' | 'GOST 256' | 'GOST 512' | 'RIPEMD-160' | 'BLAKE2b' | 'BLAKE2s' | 'BLAKE3';
 
 type EncodingType = 'Hex (Base 16)' | 'Base64' | 'Base 91' | 'Base 85' | 'Base 62' | 'Base 58' | 'Base 8' | 'Base 2';
-
-const encodeBase = (wordArray: CryptoJS.lib.WordArray, alphabet: string): string => {
-  const hex = CryptoJS.enc.Hex.stringify(wordArray);
-  if (!hex) return '';
-  let leadingZeroBytes = 0;
-  for (let i = 0; i < hex.length; i += 2) {
-    if (hex.substring(i, i + 2) === '00') leadingZeroBytes++;
-    else break;
-  }
-  let val = BigInt('0x' + (hex || '0'));
-  if (val === 0n) return alphabet[0].repeat(leadingZeroBytes) || alphabet[0];
-  const base = BigInt(alphabet.length);
-  let result = '';
-  while (val > 0n) {
-    const remainder = Number(val % base);
-    result = alphabet[remainder] + result;
-    val = val / base;
-  }
-  return alphabet[0].repeat(leadingZeroBytes) + result;
-};
-
-const encodeHash = (wordArray: CryptoJS.lib.WordArray, encoding: EncodingType): string => {
-  if (encoding === 'Hex (Base 16)') return CryptoJS.enc.Hex.stringify(wordArray);
-  if (encoding === 'Base64') return CryptoJS.enc.Base64.stringify(wordArray);
-  if (encoding === 'Base 2') {
-    const hex = CryptoJS.enc.Hex.stringify(wordArray);
-    const val = BigInt('0x' + (hex || '0'));
-    return val.toString(2).padStart(wordArray.sigBytes * 8, '0');
-  }
-  if (encoding === 'Base 8') {
-    const hex = CryptoJS.enc.Hex.stringify(wordArray);
-    const val = BigInt('0x' + (hex || '0'));
-    return val.toString(8).padStart(Math.ceil(wordArray.sigBytes * 8 / 3), '0');
-  }
-  if (encoding === 'Base 58') {
-    return encodeBase(wordArray, '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz');
-  }
-  if (encoding === 'Base 62') {
-    return encodeBase(wordArray, '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
-  }
-  if (encoding === 'Base 91') {
-    return encodeBase(wordArray, 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~"');
-  }
-  if (encoding === 'Base 85') {
-    return encodeBase(wordArray, '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#');
-  }
-  return '';
-};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
@@ -85,10 +49,36 @@ export default function App() {
   
   // Processing
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<Record<AlgoId, string>>({} as any);
+  const [results, setResults] = useState<Record<AlgoId, { status: 'computing' | 'done' | 'error', result?: string, error?: string }>>({} as any);
+
+  const workerRef = useRef<Worker | null>(null);
+  const currentJobIdRef = useRef<number>(0);
 
   // Copied state
   const [copiedId, setCopiedId] = useState<AlgoId | null>(null);
+
+  useEffect(() => {
+    workerRef.current = new Worker(new URL('./hashWorker.ts', import.meta.url), { type: 'module' });
+    
+    workerRef.current.onmessage = (e) => {
+      const { jobId, algoId, status, result, error, done } = e.data;
+      if (jobId !== currentJobIdRef.current) return;
+      
+      if (done) {
+        setIsProcessing(false);
+        return;
+      }
+      
+      setResults(prev => ({
+        ...prev,
+        [algoId as AlgoId]: { status, result, error }
+      }));
+    };
+
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   const toggleAlgo = (id: AlgoId) => {
     const next = new Set(selectedAlgos);
@@ -110,17 +100,25 @@ export default function App() {
 
   const processText = useCallback(() => {
     if (!textInput) {
-      setResults({} as Record<AlgoId, string>);
+      setResults({} as any);
       return;
     }
-    const newResults: Partial<Record<AlgoId, string>> = {};
-    for (const algo of ALGORITHMS) {
-      if (selectedAlgos.has(algo.id)) {
-        newResults[algo.id] = encodeHash(algo.lib(textInput), selectedEncoding);
-      }
-    }
-    setResults(newResults as Record<AlgoId, string>);
-  }, [textInput, selectedAlgos, selectedEncoding]);
+    
+    currentJobIdRef.current += 1;
+    const jobId = currentJobIdRef.current;
+    
+    setIsProcessing(true);
+    setResults({} as any);
+    
+    const algosList = ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map(a => a.id);
+    
+    workerRef.current?.postMessage({
+      jobId,
+      text: textInput,
+      selectedAlgos: algosList,
+      selectedEncoding
+    });
+  }, [textInput, selectedAlgos, selectedEncoding, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'text') {
@@ -133,55 +131,42 @@ export default function App() {
 
   const processFile = useCallback(async () => {
     if (!file) {
-      setResults({} as Record<AlgoId, string>);
+      setResults({} as any);
       return;
     }
     
-    setIsProcessing(true);
-    setFileError(null);
-
-    // Limit file size to 100MB for browser-based hashing via Base64 stringification warning
+    // Limit file size to 100MB
     if (file.size > 100 * 1024 * 1024) {
-      setFileError('File surpasses the 100MB browser limit. Please select a smaller file.');
+      setFileError('File surpasses the 100MB limit. Please select a smaller file.');
       setIsProcessing(false);
       return;
     }
 
+    currentJobIdRef.current += 1;
+    const jobId = currentJobIdRef.current;
+    
+    setIsProcessing(true);
+    setFileError(null);
+    setResults({} as any);
+    
     try {
-      const newResults = await new Promise<Record<AlgoId, string>>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const result = e.target?.result as string;
-            // Get base64 content
-            const base64Str = result.includes(',') ? result.split(',')[1] : null;
-            if (!base64Str) throw new Error("Could not parse file data.");
-
-            const parsedWord = CryptoJS.enc.Base64.parse(base64Str);
-            const computed: Partial<Record<AlgoId, string>> = {};
-
-            for (const algo of ALGORITHMS) {
-              if (selectedAlgos.has(algo.id)) {
-                computed[algo.id] = encodeHash(algo.lib(parsedWord), selectedEncoding);
-              }
-            }
-            resolve(computed as Record<AlgoId, string>);
-          } catch (err) {
-            reject(err);
-          }
-        };
-        reader.onerror = () => reject(new Error('Failed to read file.'));
-        reader.readAsDataURL(file);
-      });
-
-      setResults(newResults);
+      const arrayBuffer = await file.arrayBuffer();
+      
+      const algosList = ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map(a => a.id);
+      
+      workerRef.current?.postMessage({
+        jobId,
+        buffer: arrayBuffer,
+        selectedAlgos: algosList,
+        selectedEncoding
+      }, [arrayBuffer]);
+      
     } catch (e: any) {
-      setFileError(e.message || 'An error occurred while hashing the file.');
-      setResults({} as Record<AlgoId, string>);
-    } finally {
+      setFileError(e.message || 'An error occurred while reading the file.');
+      setResults({} as any);
       setIsProcessing(false);
     }
-  }, [file, selectedAlgos, selectedEncoding]);
+  }, [file, selectedAlgos, selectedEncoding, activeTab]);
 
   useEffect(() => {
     if (activeTab === 'file' && file) {
@@ -211,7 +196,7 @@ export default function App() {
   const clearState = () => {
     setTextInput('');
     setFile(null);
-    setResults({} as Record<AlgoId, string>);
+    setResults({} as any);
     setFileError(null);
   };
 
@@ -366,46 +351,70 @@ export default function App() {
             )}
 
             {/* Results Header */}
-            {isProcessing ? (
+            {Object.keys(results).length === 0 && isProcessing ? (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-slate-500 min-h-[300px]">
                 <Cpu className="w-8 h-8 animate-pulse text-indigo-500 mb-4" />
-                <p className="text-sm font-medium animate-pulse">Computing extensive hashes...</p>
+                <p className="text-sm font-medium animate-pulse">Initializing hasher...</p>
               </div>
             ) : Object.keys(results).length > 0 ? (
               <div className="flex flex-col gap-4">
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 ml-1">
-                  Generated Hashes
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between ml-1 gap-2">
+                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    Generated Hashes
+                  </h2>
+                  {isProcessing && (
+                    <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 shadow-sm w-fit">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Computing...
+                    </div>
+                  )}
+                </div>
                 <div className="grid gap-3">
-                  {ALGORITHMS.filter(a => selectedAlgos.has(a.id)).map((algo) => (
-                    results[algo.id] && (
+                  {ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map((algo) => {
+                    const res = results[algo.id as AlgoId];
+                    if (!res) return null;
+                    return (
                       <div key={algo.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col sm:flex-row items-stretch group">
                         <div className="bg-slate-100/50 border-r border-slate-100 sm:w-28 px-4 py-3 flex items-center justify-start sm:justify-center shrink-0">
                           <span className="font-semibold text-sm text-slate-700">{algo.id}</span>
                         </div>
                         <div className="flex-1 px-4 py-3 flex items-center bg-white overflow-hidden">
-                          <code className="text-[13px] font-mono text-slate-600 truncate mr-4">
-                            {results[algo.id]}
-                          </code>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(algo.id, results[algo.id])}
-                          className={cn(
-                            "flex items-center justify-center gap-2 px-5 py-3 sm:py-0 border-t sm:border-t-0 sm:border-l border-slate-100 transition-colors shrink-0 outline-none w-full sm:w-auto",
-                            copiedId === algo.id
-                              ? "bg-emerald-50 text-emerald-600"
-                              : "bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600"
-                          )}
-                        >
-                          {copiedId === algo.id ? (
-                            <><Check className="w-4 h-4" /><span className="text-xs font-semibold sm:hidden">Copied</span></>
+                          {res.status === 'computing' ? (
+                            <div className="flex items-center gap-2 text-slate-400 text-[13px] font-medium">
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                              Computing hash...
+                            </div>
+                          ) : res.status === 'error' ? (
+                            <div className="flex items-center gap-2 text-rose-500 text-[13px] font-medium truncate">
+                              <AlertTriangle className="w-4 h-4 shrink-0" />
+                              <span className="truncate">{res.error || 'Failed to compute'}</span>
+                            </div>
                           ) : (
-                            <><Copy className="w-4 h-4" /><span className="text-xs font-semibold sm:hidden">Copy</span></>
+                            <code className="text-[13px] font-mono text-slate-600 truncate mr-4">
+                              {res.result}
+                            </code>
                           )}
-                        </button>
+                        </div>
+                        {res.status === 'done' && res.result && (
+                          <button
+                            onClick={() => copyToClipboard(algo.id as AlgoId, res.result!)}
+                            className={cn(
+                              "flex items-center justify-center gap-2 px-5 py-3 sm:py-0 border-t sm:border-t-0 sm:border-l border-slate-100 transition-colors shrink-0 outline-none w-full sm:w-auto",
+                              copiedId === algo.id
+                                ? "bg-emerald-50 text-emerald-600"
+                                : "bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600"
+                            )}
+                          >
+                            {copiedId === algo.id ? (
+                              <><Check className="w-4 h-4" /><span className="text-xs font-semibold sm:hidden">Copied</span></>
+                            ) : (
+                              <><Copy className="w-4 h-4" /><span className="text-xs font-semibold sm:hidden">Copy</span></>
+                            )}
+                          </button>
+                        )}
                       </div>
-                    )
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (activeTab === 'text' && !textInput) ? (
@@ -423,31 +432,30 @@ export default function App() {
               <div>
                 <h3 className="font-bold text-slate-800 text-sm mb-4 uppercase tracking-wider">Algorithms</h3>
                 <div className="flex flex-col gap-2">
-                {ALGORITHMS.map(algo => (
+                {ALGORITHMS.filter(algo => !(activeTab === 'text' && algo.fileOnly)).map(algo => (
                   <label key={algo.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 group">
                     <div className="relative flex items-center justify-center">
                       <input 
                         type="checkbox"
                         className="peer sr-only"
-                        checked={selectedAlgos.has(algo.id)}
-                        onChange={() => toggleAlgo(algo.id)}
+                        checked={selectedAlgos.has(algo.id as AlgoId)}
+                        onChange={() => toggleAlgo(algo.id as AlgoId)}
                       />
                       <div className="w-5 h-5 rounded-[6px] border-2 border-slate-300 peer-checked:border-indigo-600 peer-checked:bg-indigo-600 flex items-center justify-center transition-all">
                         <Check className={cn(
                           "w-3.5 h-3.5 text-white transition-transform",
-                          selectedAlgos.has(algo.id) ? "scale-100" : "scale-0 opacity-0"
+                          selectedAlgos.has(algo.id as AlgoId) ? "scale-100" : "scale-0 opacity-0"
                         )} />
                       </div>
                     </div>
                     <div>
                       <span className={cn(
                         "font-medium text-sm transition-colors",
-                         selectedAlgos.has(algo.id) ? "text-slate-800" : "text-slate-500"
+                         selectedAlgos.has(algo.id as AlgoId) ? "text-slate-800" : "text-slate-500"
                       )}>
                         {algo.id}
                       </span>
-                      {algo.id === 'MD5' && <span className="block text-[11px] text-slate-400 font-medium">Fast, widely used</span>}
-                      {algo.id === 'SHA-256' && <span className="block text-[11px] text-slate-400 font-medium">Highly secure</span>}
+                      {algo.desc && <span className="block text-[11px] text-slate-400 font-medium">{algo.desc}</span>}
                     </div>
                   </label>
                 ))}
