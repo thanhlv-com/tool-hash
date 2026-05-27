@@ -18,36 +18,52 @@ const ALGORITHMS = [
 
 type AlgoId = typeof ALGORITHMS[number]['id'];
 
-type EncodingType = 'Hex (Base 16)' | 'Base64' | 'Base 62' | 'Base 2';
+type EncodingType = 'Hex (Base 16)' | 'Base64' | 'Base 91' | 'Base 85' | 'Base 62' | 'Base 58' | 'Base 8' | 'Base 2';
+
+const encodeBase = (wordArray: CryptoJS.lib.WordArray, alphabet: string): string => {
+  const hex = CryptoJS.enc.Hex.stringify(wordArray);
+  if (!hex) return '';
+  let leadingZeroBytes = 0;
+  for (let i = 0; i < hex.length; i += 2) {
+    if (hex.substring(i, i + 2) === '00') leadingZeroBytes++;
+    else break;
+  }
+  let val = BigInt('0x' + (hex || '0'));
+  if (val === 0n) return alphabet[0].repeat(leadingZeroBytes) || alphabet[0];
+  const base = BigInt(alphabet.length);
+  let result = '';
+  while (val > 0n) {
+    const remainder = Number(val % base);
+    result = alphabet[remainder] + result;
+    val = val / base;
+  }
+  return alphabet[0].repeat(leadingZeroBytes) + result;
+};
 
 const encodeHash = (wordArray: CryptoJS.lib.WordArray, encoding: EncodingType): string => {
-  if (encoding === 'Hex (Base 16)') {
-    return CryptoJS.enc.Hex.stringify(wordArray);
-  }
-  if (encoding === 'Base64') {
-    return CryptoJS.enc.Base64.stringify(wordArray);
-  }
+  if (encoding === 'Hex (Base 16)') return CryptoJS.enc.Hex.stringify(wordArray);
+  if (encoding === 'Base64') return CryptoJS.enc.Base64.stringify(wordArray);
   if (encoding === 'Base 2') {
-    let result = '';
-    for (let i = 0; i < wordArray.sigBytes; i++) {
-      const byte = (wordArray.words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff;
-      result += byte.toString(2).padStart(8, '0');
-    }
-    return result;
+    const hex = CryptoJS.enc.Hex.stringify(wordArray);
+    const val = BigInt('0x' + (hex || '0'));
+    return val.toString(2).padStart(wordArray.sigBytes * 8, '0');
+  }
+  if (encoding === 'Base 8') {
+    const hex = CryptoJS.enc.Hex.stringify(wordArray);
+    const val = BigInt('0x' + (hex || '0'));
+    return val.toString(8).padStart(Math.ceil(wordArray.sigBytes * 8 / 3), '0');
+  }
+  if (encoding === 'Base 58') {
+    return encodeBase(wordArray, '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz');
   }
   if (encoding === 'Base 62') {
-    const hex = CryptoJS.enc.Hex.stringify(wordArray);
-    if (!hex) return '0';
-    let val = BigInt('0x' + hex);
-    if (val === 0n) return '0';
-    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-    let result = '';
-    while (val > 0n) {
-      const remainder = Number(val % 62n);
-      result = charset[remainder] + result;
-      val = val / 62n;
-    }
-    return result;
+    return encodeBase(wordArray, '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
+  }
+  if (encoding === 'Base 91') {
+    return encodeBase(wordArray, 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~"');
+  }
+  if (encoding === 'Base 85') {
+    return encodeBase(wordArray, '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#');
   }
   return '';
 };
@@ -443,14 +459,14 @@ export default function App() {
                   <Settings className="w-4 h-4 text-slate-500" />
                   Digest Encoding
                 </h3>
-                <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
-                  {(['Hex (Base 16)', 'Base 62', 'Base64', 'Base 2'] as EncodingType[]).map((type) => (
+                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(['Hex (Base 16)', 'Base64', 'Base 91', 'Base 85', 'Base 62', 'Base 58', 'Base 8', 'Base 2'] as EncodingType[]).map((type) => (
                     <button
                       key={type}
                       onClick={() => setSelectedEncoding(type)}
                       className={cn(
-                        "w-full py-1.5 text-xs font-semibold rounded-lg transition-all",
-                        selectedEncoding === type ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        "flex-1 min-w-[30%] py-1.5 px-2 text-xs font-semibold rounded-lg transition-all",
+                        selectedEncoding === type ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                       )}
                     >
                       {type}
