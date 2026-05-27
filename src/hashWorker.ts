@@ -2,6 +2,7 @@ import CryptoJS from 'crypto-js';
 import { blake2b, blake2s } from '@noble/hashes/blake2.js';
 import { blake3 } from '@noble/hashes/blake3.js';
 import { ripemd160 } from '@noble/hashes/legacy.js';
+import { shake128, shake256 } from '@noble/hashes/sha3.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { streebog256, streebog512 } from '@li0ard/streebog';
 import sm3 from 'sm-crypto/src/sm3/index.js';
@@ -67,8 +68,11 @@ const ALGORITHMS: Record<string, (text?: string, buffer?: ArrayBuffer, uint8Arra
   'MD5': (t, b, u) => t !== undefined ? CryptoJS.MD5(t).toString(CryptoJS.enc.Hex) : CryptoJS.MD5(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
   'SHA-1': (t, b, u) => t !== undefined ? CryptoJS.SHA1(t).toString(CryptoJS.enc.Hex) : CryptoJS.SHA1(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
   'SHA-256': (t, b, u) => t !== undefined ? CryptoJS.SHA256(t).toString(CryptoJS.enc.Hex) : CryptoJS.SHA256(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
+  'SHA-384': (t, b, u) => t !== undefined ? CryptoJS.SHA384(t).toString(CryptoJS.enc.Hex) : CryptoJS.SHA384(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
   'SHA-512': (t, b, u) => t !== undefined ? CryptoJS.SHA512(t).toString(CryptoJS.enc.Hex) : CryptoJS.SHA512(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
   'SHA-3': (t, b, u) => t !== undefined ? CryptoJS.SHA3(t).toString(CryptoJS.enc.Hex) : CryptoJS.SHA3(arrayBufferToWordArray(b!)).toString(CryptoJS.enc.Hex),
+  'SHAKE128': (t, b, u) => bytesToHex(shake128(t !== undefined ? new TextEncoder().encode(t) : u!, { dkLen: 32 })),
+  'SHAKE256': (t, b, u) => bytesToHex(shake256(t !== undefined ? new TextEncoder().encode(t) : u!, { dkLen: 64 })),
   'SM3': (t, b, u) => t !== undefined ? sm3(t) : sm3(Array.from(u!)),
   'GOST 256': (t, b, u) => bytesToHex(streebog256(t !== undefined ? new TextEncoder().encode(t) : u!)),
   'GOST 512': (t, b, u) => bytesToHex(streebog512(t !== undefined ? new TextEncoder().encode(t) : u!)),

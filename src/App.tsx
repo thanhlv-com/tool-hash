@@ -17,8 +17,11 @@ const ALGORITHMS: AlgorithmDef[] = [
   { id: 'MD5', desc: 'Fast, widely used' },
   { id: 'SHA-1', desc: 'Legacy, fast', fileOnly: true },
   { id: 'SHA-256', desc: 'Highly secure' },
+  { id: 'SHA-384', desc: 'Secure, 384-bit' },
   { id: 'SHA-512', desc: '64-bit opt.' },
   { id: 'SHA-3', desc: 'Latest standard' },
+  { id: 'SHAKE128', desc: 'SHA-3 XOF' },
+  { id: 'SHAKE256', desc: 'SHA-3 XOF' },
   { id: 'SM3', desc: 'Chinese standard' },
   { id: 'GOST 256', desc: 'Streebog 256' },
   { id: 'GOST 512', desc: 'Streebog 512', fileOnly: true },
@@ -28,7 +31,7 @@ const ALGORITHMS: AlgorithmDef[] = [
   { id: 'BLAKE3', desc: 'Extremely fast' },
 ];
 
-type AlgoId = 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-512' | 'SHA-3' | 'SM3' | 'GOST 256' | 'GOST 512' | 'RIPEMD-160' | 'BLAKE2b' | 'BLAKE2s' | 'BLAKE3';
+type AlgoId = 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | 'SHA-3' | 'SHAKE128' | 'SHAKE256' | 'SM3' | 'GOST 256' | 'GOST 512' | 'RIPEMD-160' | 'BLAKE2b' | 'BLAKE2s' | 'BLAKE3';
 
 type EncodingType = 'Hex (Base 16)' | 'Base64' | 'Base 91' | 'Base 85' | 'Base 62' | 'Base 58' | 'Base 8' | 'Base 2';
 
