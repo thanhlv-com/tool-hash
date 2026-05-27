@@ -710,6 +710,13 @@ export default function App() {
           </aside>
 
         </div>
+        
+        {/* Footer */}
+        <footer className="mt-16 text-center pb-8 border-t border-slate-200 dark:border-slate-800 pt-8">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            Check out more tools at <a href="https://link.thanhlv.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">link.thanhlv.com</a>
+          </p>
+        </footer>
       </div>
     </div>
   );
