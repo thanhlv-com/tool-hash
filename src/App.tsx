@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2, Moon, Sun, Monitor, Info } from 'lucide-react';
+import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2, Moon, Sun, Monitor, Info, Download } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -287,6 +287,77 @@ export default function App() {
     setFileError(null);
   };
 
+  const getComputedResults = () => {
+    const computedAlgos = ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly));
+    const finalResults: { algo: string, hash: string }[] = [];
+    computedAlgos.forEach(a => {
+      const res = results[a.id as AlgoId];
+      if (res && res.status === 'done' && res.result) {
+        finalResults.push({ algo: a.id, hash: res.result });
+      }
+    });
+    return finalResults;
+  };
+
+  const generateOutputHeader = () => {
+    let header = `Multi-Algorithm Hasher Output\nDate: ${new Date().toLocaleString()}\n`;
+    header += `Encoding: ${selectedEncoding}\n`;
+    if (activeTab === 'file' && file) {
+      header += `File: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)\n\n`;
+    } else {
+      header += `Type: Text Input\n\n`;
+    }
+    return header;
+  };
+
+  const handleCopyAll = () => {
+    const finalResults = getComputedResults();
+    if (finalResults.length === 0) return;
+    let text = generateOutputHeader();
+    finalResults.forEach(r => {
+      text += `${r.algo}:\n${r.hash}\n\n`;
+    });
+    navigator.clipboard.writeText(text);
+    setCopiedId('ALL' as AlgoId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleExportText = () => {
+    const finalResults = getComputedResults();
+    if (finalResults.length === 0) return;
+    let text = generateOutputHeader();
+    finalResults.forEach(r => {
+      text += `${r.algo}:\n${r.hash}\n\n`;
+    });
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hashes_${activeTab === 'file' && file ? file.name : 'text'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = () => {
+    const finalResults = getComputedResults();
+    if (finalResults.length === 0) return;
+    let csv = `Algorithm,Hash\n`;
+    finalResults.forEach(r => {
+      csv += `"${r.algo}","${r.hash}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hashes_${activeTab === 'file' && file ? file.name : 'text'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-sans selection:bg-indigo-100 dark:bg-indigo-900/60 selection:text-indigo-900">
       <div className="max-w-5xl mx-auto px-4 py-12 md:py-16">
@@ -471,12 +542,40 @@ export default function App() {
                   <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                     Generated Hashes
                   </h2>
-                  {isProcessing && (
-                    <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50 shadow-sm w-fit">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Computing...
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {Object.values(results).some(r => r && r.status === 'done' && r.result) && (
+                       <div className="flex items-center gap-1.5 mr-2">
+                         <button
+                           onClick={handleCopyAll}
+                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm"
+                         >
+                           {copiedId === 'ALL' ? (
+                             <><Check className="w-3.5 h-3.5" /> Copied</>
+                           ) : (
+                             <><Copy className="w-3.5 h-3.5" /> Copy All</>
+                           )}
+                         </button>
+                         <button
+                           onClick={handleExportText}
+                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm hidden sm:flex"
+                         >
+                           <Download className="w-3.5 h-3.5" /> TXT
+                         </button>
+                         <button
+                           onClick={handleExportCSV}
+                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shadow-sm hidden sm:flex"
+                         >
+                           <Download className="w-3.5 h-3.5" /> CSV
+                         </button>
+                       </div>
+                    )}
+                    {isProcessing && (
+                      <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50 shadow-sm w-fit">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Computing...
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   {ALGORITHMS.filter(a => selectedAlgos.has(a.id as AlgoId) && !(activeTab === 'text' && a.fileOnly)).map((algo) => {
