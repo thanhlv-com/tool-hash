@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2, Moon, Sun, Monitor } from 'lucide-react';
+import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2, Moon, Sun, Monitor, Info } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -10,25 +10,26 @@ function cn(...inputs: ClassValue[]) {
 type AlgorithmDef = {
   id: string;
   desc?: string;
+  details?: string;
   fileOnly?: boolean;
 };
 
 const ALGORITHMS: AlgorithmDef[] = [
-  { id: 'MD5', desc: 'Fast, widely used' },
-  { id: 'SHA-1', desc: 'Legacy, fast', fileOnly: true },
-  { id: 'SHA-256', desc: 'Highly secure' },
-  { id: 'SHA-384', desc: 'Secure, 384-bit' },
-  { id: 'SHA-512', desc: '64-bit opt.' },
-  { id: 'SHA-3', desc: 'Latest standard' },
-  { id: 'SHAKE128', desc: 'SHA-3 XOF' },
-  { id: 'SHAKE256', desc: 'SHA-3 XOF' },
-  { id: 'SM3', desc: 'Chinese standard' },
-  { id: 'GOST 256', desc: 'Streebog 256' },
-  { id: 'GOST 512', desc: 'Streebog 512', fileOnly: true },
-  { id: 'RIPEMD-160', desc: 'Bitcoin standard' },
-  { id: 'BLAKE2b', desc: 'Faster on 64-bit', fileOnly: true },
-  { id: 'BLAKE2s', desc: 'Faster on 32-bit', fileOnly: true },
-  { id: 'BLAKE3', desc: 'Extremely fast' },
+  { id: 'MD5', desc: 'Fast, widely used', details: 'A widely used 128-bit hash function. Considered cryptographically broken but still used for checksums.' },
+  { id: 'SHA-1', desc: 'Legacy, fast', fileOnly: true, details: 'A 160-bit hash function. No longer considered secure against well-funded attackers.' },
+  { id: 'SHA-256', desc: 'Highly secure', details: 'A 256-bit hash from the SHA-2 family. Highly secure, used in TLS, SSL, SSH, and Bitcoin.' },
+  { id: 'SHA-384', desc: 'Secure, 384-bit', details: 'A 384-bit hash from the SHA-2 family. Used when increased security margin over SHA-256 is desired.' },
+  { id: 'SHA-512', desc: '64-bit opt.', details: 'A 512-bit hash from the SHA-2 family. Highly secure and faster on 64-bit architectures.' },
+  { id: 'SHA-3', desc: 'Latest standard', details: 'The latest member of the Secure Hash Algorithm family, based on Keccak. Highly secure sponge construction.' },
+  { id: 'SHAKE128', desc: 'SHA-3 XOF', details: 'An extendable-output function (XOF) from the SHA-3 family. We output 32 bytes (256 bits).' },
+  { id: 'SHAKE256', desc: 'SHA-3 XOF', details: 'An extendable-output function (XOF) from the SHA-3 family. We output 64 bytes (512 bits).' },
+  { id: 'SM3', desc: 'Chinese standard', details: 'A cryptographic hash function used in the Chinese National Standard (Guomi).' },
+  { id: 'GOST 256', desc: 'Streebog 256', details: 'The GOST R 34.11-2012 (Streebog) hash function with 256-bit output.' },
+  { id: 'GOST 512', desc: 'Streebog 512', fileOnly: true, details: 'The GOST R 34.11-2012 (Streebog) hash function with 512-bit output.' },
+  { id: 'RIPEMD-160', desc: 'Bitcoin standard', details: 'A 160-bit cryptographic hash function, most commonly used in the Bitcoin standard.' },
+  { id: 'BLAKE2b', desc: 'Faster on 64-bit', fileOnly: true, details: 'A cryptographic hash function faster than MD5/SHA-1/SHA-2/SHA-3, optimized for 64-bit platforms.' },
+  { id: 'BLAKE2s', desc: 'Faster on 32-bit', fileOnly: true, details: 'A variant of BLAKE2 optimized for 8-bit to 32-bit platforms.' },
+  { id: 'BLAKE3', desc: 'Extremely fast', details: 'A highly parallelizable, extremely fast cryptographic hash function. Much faster than MD5 or SHA-256.' },
 ];
 
 type AlgoId = 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | 'SHA-3' | 'SHAKE128' | 'SHAKE256' | 'SM3' | 'GOST 256' | 'GOST 512' | 'RIPEMD-160' | 'BLAKE2b' | 'BLAKE2s' | 'BLAKE3';
@@ -541,8 +542,8 @@ export default function App() {
                 <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 uppercase tracking-wider">Algorithms</h3>
                 <div className="flex flex-col gap-2">
                 {ALGORITHMS.filter(algo => !(activeTab === 'text' && algo.fileOnly)).map(algo => (
-                  <label key={algo.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700 dark:border-slate-800/60 group">
-                    <div className="relative flex items-center justify-center">
+                  <label key={algo.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700 dark:border-slate-800/60 group">
+                    <div className="relative flex items-center justify-center mt-0.5">
                       <input 
                         type="checkbox"
                         className="peer sr-only"
@@ -556,13 +557,25 @@ export default function App() {
                         )} />
                       </div>
                     </div>
-                    <div>
-                      <span className={cn(
-                        "font-medium text-sm transition-colors",
-                         selectedAlgos.has(algo.id as AlgoId) ? "text-slate-800 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"
-                      )}>
-                        {algo.id}
-                      </span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={cn(
+                          "font-medium text-sm transition-colors",
+                           selectedAlgos.has(algo.id as AlgoId) ? "text-slate-800 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"
+                        )}>
+                          {algo.id}
+                        </span>
+                        {algo.details && (
+                          <div className="relative group/tooltip flex items-center">
+                             <Info className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors" />
+                             <div className="absolute right-0 top-full mt-2 w-48 p-2.5 bg-slate-800 dark:bg-slate-700 text-white dark:text-slate-100 text-xs rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-10 pointer-events-none sm:-right-2 sm:top-1/2 sm:-translate-y-1/2 sm:translate-x-full sm:mt-0 sm:ml-2">
+                               {algo.details}
+                               <div className="hidden sm:block absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-slate-800 dark:bg-slate-700 rotate-45"></div>
+                               <div className="sm:hidden absolute top-[-4px] right-3 w-2 h-2 bg-slate-800 dark:bg-slate-700 rotate-45"></div>
+                             </div>
+                          </div>
+                        )}
+                      </div>
                       {algo.desc && <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">{algo.desc}</span>}
                     </div>
                   </label>
