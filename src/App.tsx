@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2 } from 'lucide-react';
+import { FileText, Copy, Check, UploadCloud, Trash2, Cpu, Hash, AlertTriangle, ShieldCheck, Settings, Loader2, Moon, Sun, Monitor } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -35,7 +35,38 @@ type AlgoId = 'MD5' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | 'SHA-3' | 'S
 
 type EncodingType = 'Hex (Base 16)' | 'Base64' | 'Base 91' | 'Base 85' | 'Base 62' | 'Base 58' | 'Base 8' | 'Base 2';
 
+type Theme = 'light' | 'dark' | 'system';
+
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('hasher-theme') as Theme) || 'system');
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    let cleanup = () => {};
+
+    const applyTheme = () => {
+      root.classList.remove('light', 'dark');
+      if (theme === 'system') {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.classList.add(systemTheme);
+      } else {
+        root.classList.add(theme);
+      }
+    };
+
+    applyTheme();
+    localStorage.setItem('hasher-theme', theme);
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      mediaQuery.addEventListener('change', handleChange);
+      cleanup = () => mediaQuery.removeEventListener('change', handleChange);
+    }
+
+    return cleanup;
+  }, [theme]);
+
   const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
   
   // Text state
@@ -256,7 +287,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-sans selection:bg-indigo-100 dark:bg-indigo-900/60 selection:text-indigo-900">
       <div className="max-w-5xl mx-auto px-4 py-12 md:py-16">
         
         {/* Header */}
@@ -266,17 +297,39 @@ export default function App() {
               <div className="bg-indigo-600 p-2.5 rounded-xl shadow-sm text-white">
                 <Hash className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
                 Multi-Algorithm Hasher
               </h1>
             </div>
-            <p className="text-slate-500 font-medium max-w-lg">
+            <p className="text-slate-500 dark:text-slate-400 font-medium max-w-lg">
               Securely hash text and files locally in your browser. Data never leaves your device.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 shadow-sm">
-            <ShieldCheck className="w-4 h-4" />
-            <span>100% Client-side Processing</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full p-1 shadow-sm">
+              <button
+                onClick={() => setTheme('light')}
+                className={cn("p-1.5 rounded-full transition-all text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", theme === 'light' && "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white")}
+              >
+                <Sun className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={cn("p-1.5 rounded-full transition-all text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", theme === 'dark' && "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white")}
+              >
+                <Moon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setTheme('system')}
+                className={cn("p-1.5 rounded-full transition-all text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200", theme === 'system' && "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white")}
+              >
+                <Monitor className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-full border border-emerald-100 dark:border-emerald-900/50 shadow-sm">
+              <ShieldCheck className="w-4 h-4" />
+              <span>100% Client-side</span>
+            </div>
           </div>
         </header>
 
@@ -285,17 +338,17 @@ export default function App() {
           {/* Main Workspace */}
           <div className="flex flex-col gap-6">
             
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
               
               {/* Tab Navigation */}
-              <div className="flex border-b border-slate-200">
+              <div className="flex border-b border-slate-200 dark:border-slate-800">
                 <button
                   onClick={() => { setActiveTab('text'); clearState(); }}
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors border-b-2 hover:bg-slate-50",
+                    "flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors border-b-2 hover:bg-slate-50 dark:hover:bg-slate-800/50",
                     activeTab === 'text' 
-                      ? "border-indigo-600 text-indigo-700 bg-indigo-50/50" 
-                      : "border-transparent text-slate-500"
+                      ? "border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20" 
+                      : "border-transparent text-slate-500 dark:text-slate-400"
                   )}
                 >
                   <FileText className="w-4 h-4" />
@@ -304,10 +357,10 @@ export default function App() {
                 <button
                   onClick={() => { setActiveTab('file'); clearState(); }}
                   className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors border-b-2 hover:bg-slate-50",
+                    "flex-1 flex items-center justify-center gap-2 py-4 text-sm font-medium transition-colors border-b-2 hover:bg-slate-50 dark:hover:bg-slate-800/50",
                     activeTab === 'file' 
-                      ? "border-indigo-600 text-indigo-700 bg-indigo-50/50" 
-                      : "border-transparent text-slate-500"
+                      ? "border-indigo-600 text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20" 
+                      : "border-transparent text-slate-500 dark:text-slate-400"
                   )}
                 >
                   <UploadCloud className="w-4 h-4" />
@@ -323,13 +376,13 @@ export default function App() {
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
                       placeholder="Type or paste your text here..."
-                      className="flex-1 w-full resize-none outline-none text-slate-700 bg-transparent placeholder:text-slate-400"
+                      className="flex-1 w-full resize-none outline-none text-slate-700 dark:text-slate-300 bg-transparent placeholder:text-slate-400 dark:text-slate-500"
                     />
                     {textInput && (
-                      <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800/60">
                         <button
                           onClick={clearState}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors"
+                          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:text-rose-400 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Clear Text
@@ -341,7 +394,7 @@ export default function App() {
                   <div 
                     className={cn(
                       "flex flex-col items-center justify-center border-2 border-dashed rounded-xl h-64 transition-all relative overflow-hidden",
-                      file ? "border-indigo-200 bg-indigo-50/50" : "border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-indigo-300"
+                      file ? "border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/20" : "border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-indigo-300 dark:border-indigo-700"
                     )}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
@@ -355,37 +408,37 @@ export default function App() {
                     
                     {!file ? (
                       <div className="text-center px-6">
-                        <div className="w-12 h-12 bg-white rounded-full shadow-sm border border-slate-200 flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                        <div className="w-12 h-12 bg-white dark:bg-slate-900 rounded-full shadow-sm border border-slate-200 dark:border-slate-800 flex items-center justify-center mx-auto mb-4 text-indigo-600 dark:text-indigo-400">
                           <UploadCloud className="w-6 h-6" />
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-800 mb-1">Upload a file</h3>
-                        <p className="text-xs text-slate-500 mb-4">Drag and drop, or click to browse</p>
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">Upload a file</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Drag and drop, or click to browse</p>
                         <button 
                           onClick={() => fileInputRef.current?.click()}
                           className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
                         >
                           Browse Files
                         </button>
-                        <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-wider font-semibold">Max file size: 100MB</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-4 uppercase tracking-wider font-semibold">Max file size: 100MB</p>
                       </div>
                     ) : (
                       <div className="text-center w-full px-6 flex flex-col items-center justify-center">
-                        <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3 text-indigo-700">
+                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/60 rounded-full flex items-center justify-center mx-auto mb-3 text-indigo-700 dark:text-indigo-400">
                           <FileText className="w-6 h-6" />
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-800 truncate max-w-full mb-1">{file.name}</h3>
-                        <p className="text-xs text-slate-500 mb-4">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate max-w-full mb-1">{file.name}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                         
                         <div className="flex gap-3">
                           <button 
                             onClick={clearState}
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors shadow-sm"
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors shadow-sm"
                           >
                             Remove
                           </button>
                           <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 transition-colors shadow-sm"
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/60 rounded-md hover:bg-indigo-200 transition-colors shadow-sm"
                           >
                             Change File
                           </button>
@@ -399,26 +452,26 @@ export default function App() {
 
             {/* Error Message */}
             {fileError && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium">
-                <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
+              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium">
+                <AlertTriangle className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0" />
                 <p>{fileError}</p>
               </div>
             )}
 
             {/* Results Header */}
             {Object.keys(results).length === 0 && isProcessing ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-slate-500 min-h-[300px]">
-                <Cpu className="w-8 h-8 animate-pulse text-indigo-500 mb-4" />
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 min-h-[300px]">
+                <Cpu className="w-8 h-8 animate-pulse text-indigo-500 dark:text-indigo-400 mb-4" />
                 <p className="text-sm font-medium animate-pulse">Initializing hasher...</p>
               </div>
             ) : Object.keys(results).length > 0 ? (
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between ml-1 gap-2">
-                  <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                     Generated Hashes
                   </h2>
                   {isProcessing && (
-                    <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 shadow-sm w-fit">
+                    <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2.5 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50 shadow-sm w-fit">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Computing...
                     </div>
@@ -429,23 +482,23 @@ export default function App() {
                     const res = results[algo.id as AlgoId];
                     if (!res) return null;
                     return (
-                      <div key={algo.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col sm:flex-row items-stretch group">
-                        <div className="bg-slate-100/50 border-r border-slate-100 sm:w-28 px-4 py-3 flex items-center justify-start sm:justify-center shrink-0">
-                          <span className="font-semibold text-sm text-slate-700">{algo.id}</span>
+                      <div key={algo.id} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col sm:flex-row items-stretch group">
+                        <div className="bg-slate-100/50 dark:bg-slate-800/50 border-r border-slate-100 dark:border-slate-800/60 sm:w-28 px-4 py-3 flex items-center justify-start sm:justify-center shrink-0">
+                          <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">{algo.id}</span>
                         </div>
-                        <div className="flex-1 px-4 py-3 flex items-center bg-white overflow-hidden">
+                        <div className="flex-1 px-4 py-3 flex items-center bg-white dark:bg-slate-900 overflow-hidden">
                           {res.status === 'computing' ? (
-                            <div className="flex items-center gap-2 text-slate-400 text-[13px] font-medium">
-                              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                            <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-[13px] font-medium">
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-500 dark:text-indigo-400" />
                               Computing hash...
                             </div>
                           ) : res.status === 'error' ? (
-                            <div className="flex items-center gap-2 text-rose-500 text-[13px] font-medium truncate">
+                            <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 text-[13px] font-medium truncate">
                               <AlertTriangle className="w-4 h-4 shrink-0" />
                               <span className="truncate">{res.error || 'Failed to compute'}</span>
                             </div>
                           ) : (
-                            <code className="text-[13px] font-mono text-slate-600 truncate mr-4">
+                            <code className="text-[13px] font-mono text-slate-600 dark:text-slate-400 truncate mr-4">
                               {res.result}
                             </code>
                           )}
@@ -454,10 +507,10 @@ export default function App() {
                           <button
                             onClick={() => copyToClipboard(algo.id as AlgoId, res.result!)}
                             className={cn(
-                              "flex items-center justify-center gap-2 px-5 py-3 sm:py-0 border-t sm:border-t-0 sm:border-l border-slate-100 transition-colors shrink-0 outline-none w-full sm:w-auto",
+                              "flex items-center justify-center gap-2 px-5 py-3 sm:py-0 border-t sm:border-t-0 sm:border-l border-slate-100 dark:border-slate-800/60 transition-colors shrink-0 outline-none w-full sm:w-auto",
                               copiedId === algo.id
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-slate-50 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600"
+                                ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-slate-50 dark:bg-slate-950 hover:bg-indigo-50 dark:bg-indigo-900/40 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:text-indigo-400"
                             )}
                           >
                             {copiedId === algo.id ? (
@@ -473,7 +526,7 @@ export default function App() {
                 </div>
               </div>
             ) : (activeTab === 'text' && !textInput) ? (
-              <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 flex flex-col items-center justify-center text-slate-400 h-[200px]">
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-8 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 h-[200px]">
                 <p className="text-sm font-medium">Results will appear here...</p>
               </div>
             ) : null}
@@ -482,13 +535,13 @@ export default function App() {
 
           {/* Right Sidebar: Algorithm Settings */}
           <aside>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sticky top-8 flex flex-col gap-6">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-5 sticky top-8 flex flex-col gap-6">
               
               <div>
-                <h3 className="font-bold text-slate-800 text-sm mb-4 uppercase tracking-wider">Algorithms</h3>
+                <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 uppercase tracking-wider">Algorithms</h3>
                 <div className="flex flex-col gap-2">
                 {ALGORITHMS.filter(algo => !(activeTab === 'text' && algo.fileOnly)).map(algo => (
-                  <label key={algo.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 group">
+                  <label key={algo.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer border border-transparent hover:border-slate-100 dark:hover:border-slate-700 dark:border-slate-800/60 group">
                     <div className="relative flex items-center justify-center">
                       <input 
                         type="checkbox"
@@ -496,7 +549,7 @@ export default function App() {
                         checked={selectedAlgos.has(algo.id as AlgoId)}
                         onChange={() => toggleAlgo(algo.id as AlgoId)}
                       />
-                      <div className="w-5 h-5 rounded-[6px] border-2 border-slate-300 peer-checked:border-indigo-600 peer-checked:bg-indigo-600 flex items-center justify-center transition-all">
+                      <div className="w-5 h-5 rounded-[6px] border-2 border-slate-300 dark:border-slate-700 peer-checked:border-indigo-600 peer-checked:bg-indigo-600 flex items-center justify-center transition-all">
                         <Check className={cn(
                           "w-3.5 h-3.5 text-white transition-transform",
                           selectedAlgos.has(algo.id as AlgoId) ? "scale-100" : "scale-0 opacity-0"
@@ -506,37 +559,37 @@ export default function App() {
                     <div>
                       <span className={cn(
                         "font-medium text-sm transition-colors",
-                         selectedAlgos.has(algo.id as AlgoId) ? "text-slate-800" : "text-slate-500"
+                         selectedAlgos.has(algo.id as AlgoId) ? "text-slate-800 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"
                       )}>
                         {algo.id}
                       </span>
-                      {algo.desc && <span className="block text-[11px] text-slate-400 font-medium">{algo.desc}</span>}
+                      {algo.desc && <span className="block text-[11px] text-slate-400 dark:text-slate-500 font-medium">{algo.desc}</span>}
                     </div>
                   </label>
                 ))}
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100">
-                <h3 className="font-bold text-slate-800 text-sm mb-4 uppercase tracking-wider flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-slate-500" />
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800/60">
+                <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4 uppercase tracking-wider flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   Digest Encoding
                 </h3>
-                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
+                <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                   {(['Hex (Base 16)', 'Base64', 'Base 91', 'Base 85', 'Base 62', 'Base 58', 'Base 8', 'Base 2'] as EncodingType[]).map((type) => (
                     <button
                       key={type}
                       onClick={() => setSelectedEncoding(type)}
                       className={cn(
                         "flex-1 min-w-[30%] py-1.5 px-2 text-xs font-semibold rounded-lg transition-all",
-                        selectedEncoding === type ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                        selectedEncoding === type ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-200/50 dark:bg-slate-700/50"
                       )}
                     >
                       {type}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-3 font-medium">
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 font-medium">
                   Resulting hash string representation. Hex is standard.
                 </p>
               </div>
